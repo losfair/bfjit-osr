@@ -1,3 +1,5 @@
+// This file is taken from Wasmer with modification.
+
 use libc::{c_int, c_void, siginfo_t};
 use nix::sys::signal::{
     sigaction, SaFlags, SigAction, SigHandler, SigSet, Signal, SIGBUS, SIGFPE, SIGILL, SIGSEGV,
