@@ -27,6 +27,9 @@ enum Token {
     Input,
     LoopBegin,
     LoopEnd,
+
+    LoopToZero,
+    LoopToAdd,
 }
 
 impl Codegen {
@@ -93,7 +96,36 @@ impl Codegen {
                 _ => {}
             };
         }
+        if self.ctx.opt_level > 0 {
+            tokens = self.opt_inst_combine(&tokens);
+        }
+        
         self.do_translate(&tokens)
+    }
+
+    fn opt_inst_combine(&self, tokens: &[Token]) -> Vec<Token> {
+        let mut ret: Vec<Token> = vec![];
+        let mut i: usize = 0;
+        loop {
+            if i >= tokens.len() {
+                break;
+            }
+            match tokens[i..] {
+                [Token::LoopBegin, Token::Sub(1), Token::LoopEnd, ..] => {
+                    ret.push(Token::LoopToZero);
+                    i += 3;
+                }
+                [Token::LoopBegin, Token::Sub(1), Token::Forward(1), Token::Add(1), Token::Backward(1), Token::LoopEnd, ..] => {
+                    ret.push(Token::LoopToAdd);
+                    i += 6;
+                }
+                _ => {
+                    ret.push(tokens[i]);
+                    i += 1;
+                }
+            }
+        }
+        ret
     }
 
     fn do_translate(&self, input: &[Token]) -> JitOutput {
@@ -151,13 +183,27 @@ impl Codegen {
                     let (start, end) = labels.pop().unwrap();
                     dynasm!(
                         out
-                        ; nop
                         ; cmp BYTE [rdi], 0
                         ; jne =>start
                         ; =>end
                     );
                 },
-                _ => {}
+                Token::LoopToZero => {
+                    loop_end_patch_offsets.push(out.offset().0);
+                    dynasm!(
+                        out
+                        ; mov BYTE [rdi], 0
+                    );
+                },
+                Token::LoopToAdd => {
+                    loop_end_patch_offsets.push(out.offset().0);
+                    dynasm!(
+                        out
+                        ; mov sil, BYTE [rdi]
+                        ; add BYTE [rdi + 1], sil
+                        ; mov BYTE [rdi], 0
+                    );
+                }
             }
         }
         dynasm!(out ; ret);

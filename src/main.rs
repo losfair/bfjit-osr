@@ -1,4 +1,5 @@
 #![feature(proc_macro_hygiene)]
+#![feature(slice_patterns)]
 
 #[macro_use]
 extern crate dynasm;
